@@ -1,38 +1,47 @@
 <?php
 /**
  * @wordpress-plugin
- * Plugin Name:       IU Pressbooks LTI
- * Description:       LTI Integration for Pressbooks at IU. Based on the Candela LTI integration from Lumen Learning, but looks for a specified custom LTI parameter to use for the WordPress login id (instead of using the generated LTI user id)
+ * Plugin Name:       Wisc Pressbooks LTI
+ * Description:       LTI Integration for Pressbooks at UW-Madison. Based on the Candela LTI integration from Lumen Learning, but looks for a specified custom LTI parameter to use for the WordPress login id (instead of using the generated LTI user id)
  * Version:           0.1
- * Author:            UITS eLearning Design and Services
- * Author URI:        http://teachingonline.iu.edu
+ * Author:            UW-Madison Learning Solutions 
+ * Author URI:        
  * Text Domain:       lti
  * License:           MIT
  * GitHub Plugin URI: 
  */
 
+namespace WiscLTI;
+
+use \WiscLTI\OAuth\OAuthSignatureMethod_HMAC_SHA1;
+use \WiscLTI\OAuth\OAuthConsumer;
+use \WiscLTI\OAuth\OAuthRequest;
+use WiscLTI\Util\Net;
+
+
 // If file is called directly, abort.
 if ( ! defined( 'ABSPATH' ) ) exit;
 
 // Do our necessary plugin setup and add_action routines.
-IUPB_LTI::init();
+WISCPB_LTI::init();
 
-class IUPB_LTI {
+class WISCPB_LTI {
   /**
    * Takes care of registering our hooks and setting constants.
    */
   public static function init() {
     // Table name is always root (site)
-    define('IUPB_LTI_TABLE', 'wp_iupblti');
-    define('IUPB_LTI_DB_VERSION', '1.2');
-    define('IUPB_LTI_CAP_LINK_LTI', 'iupb link lti launch');
-    define('IUPB_LTI_USERMETA_LASTLINK', 'iupblti_lastkey');
-    define('IUPB_LTI_USERMETA_ENROLLMENT', 'iupblti_enrollment_record');
-    define('IUPB_LTI_PASSWORD_LENGTH', 32);
+    define('WISCPB_LTI_TABLE', 'wp_wiscpblti');
+    define('WISCPB_LTI_DB_VERSION', '1.2');
+    define('WISCPB_LTI_CAP_LINK_LTI', 'wiscpb link lti launch');
+    define('WISCPB_LTI_USERMETA_LASTLINK', 'wiscpblti_lastkey');
+    define('WISCPB_LTI_USERMETA_ENROLLMENT', 'wiscpblti_enrollment_record');
+    define('WISCPB_LTI_PASSWORD_LENGTH', 32);
 
     //E. Scull: Add new constants ======================================
-    define('IU_LTI_LOGIN_ID_POST_PARAM', 'custom_canvas_user_login_id');
-    define('IU_DEFAULT_EMAIL_DOMAIN', 'iu.edu');
+    define('WISC_LTI_LOGIN_ID_POST_PARAM', 'custom_canvas_user_login_id');
+    define('WISC_DEFAULT_EMAIL_DOMAIN', 'wisc.edu');
+    define('WISC_OUTCOMES_TABLE', 'wp_wiscltioutcomes');
     // =================================================================
 
     register_activation_hook( __FILE__, array( __CLASS__, 'activate' ) );
@@ -48,10 +57,12 @@ class IUPB_LTI {
     add_action( 'lti_setup', array( __CLASS__, 'lti_setup' ) );
     add_action( 'lti_launch', array( __CLASS__, 'lti_launch') );
 
-    add_action('admin_menu', array( __CLASS__, 'admin_menu'));
+    add_action('lti_outcome', array(__CLASS__, 'sendGrade'), 10, 4);
 
-    define('IUPB_LTI_TEACHERS_ONLY', 'iupb_lti_teachers_only');
-    add_option( IUPB_LTI_TEACHERS_ONLY, false );
+//    add_action('admin_menu', array( __CLASS__, 'admin_menu'));
+
+    define('WISCPB_LTI_TEACHERS_ONLY', 'wiscpb_lti_teachers_only');
+    add_option( WISCPB_LTI_TEACHERS_ONLY, false );
 	}
 
   /**
@@ -63,7 +74,7 @@ class IUPB_LTI {
       wp_die('This plugin requires the LTI plugin to be installed and active. <br /><a href="' . admin_url( 'plugins.php' ) . '">&laquo; Return to Plugins</a>');' )';
     }
 
-    IUPB_LTI::create_db_table();
+    WISCPB_LTI::create_db_table();
   }
 
   // Comment out the code that adds the deprecated "LTI Maps" functionality to the admin nav.
@@ -105,7 +116,7 @@ class IUPB_LTI {
    * Do any necessary cleanup.
    */
   public static function deactivate() {
-    IUPB_LTI::remove_db_table();
+    WISCPB_LTI::remove_db_table();
   }
 
   /**
@@ -113,10 +124,16 @@ class IUPB_LTI {
    */
   public static function lti_launch() {
     global $wp;
+      $current_user = wp_get_current_user();
 
+      WISCPB_LTI::save_outcome_info($_POST['lis_outcome_service_url'],
+          $wp->query_vars['page_id'],
+          $current_user->ID, $wp->query_vars['blog'], $_POST["lis_result_sourcedid"]);
+
+//      WISCPB_LTI::sendGrade(.5, $current_user->ID, $wp->query_vars['page_id'], $wp->query_vars['blog']);
     // allows deep links with an LTI launch urls like:
-    // <iupb>/api/lti/BLOGID?page_title=page_name
-    // <iupb>/api/lti/BLOGID?page_title=section_name%2Fpage_name
+    // <wiscpb>/api/lti/BLOGID?page_title=page_name
+    // <wiscpb>/api/lti/BLOGID?page_title=section_name%2Fpage_name
     if ( ! empty($wp->query_vars['page_title'] ) ) {
       switch_to_blog((int)$wp->query_vars['blog']);
       $page = $wp->query_vars['page_title'];
@@ -133,7 +150,7 @@ class IUPB_LTI {
     }
 
     // allows deep links with an LTI launch urls like:
-    // <iupb>/api/lti/BLOGID?page_id=10
+    // <wiscpb>/api/lti/BLOGID?page_id=10
     if ( ! empty($wp->query_vars['page_id'] ) && is_numeric($wp->query_vars['page_id']) ) {
       switch_to_blog((int)$wp->query_vars['blog']);
       $url = get_bloginfo('wpurl') . "?p=" . $wp->query_vars['page_id'] . "&content_only&lti_context_id=" . $wp->query_vars['context_id'];
@@ -153,7 +170,7 @@ class IUPB_LTI {
     }
 
     if ( ! empty($wp->query_vars['resource_link_id'] ) ) {
-      $map = IUPB_LTI::get_lti_map($wp->query_vars['resource_link_id']);
+      $map = WISCPB_LTI::get_lti_map($wp->query_vars['resource_link_id']);
       if ( ! empty( $map->target_action ) ) {
         wp_redirect( $map->target_action );
         exit;
@@ -176,12 +193,12 @@ class IUPB_LTI {
    */
   public static function lti_setup() {
     // Manage authentication and account creation.
-    IUPB_LTI::lti_accounts();
+    WISCPB_LTI::lti_accounts();
 
     // If this is a valid user store the resource_link_id so we have it later.
-    if ( IUPB_LTI::user_can_map_lti_links() ) {
+    if ( WISCPB_LTI::user_can_map_lti_links() ) {
       $current_user = wp_get_current_user();
-      update_user_meta( $current_user->ID, IUPB_LTI_USERMETA_LASTLINK, $_POST['resource_link_id'] );
+      update_user_meta( $current_user->ID, WISCPB_LTI_USERMETA_LASTLINK, $_POST['resource_link_id'] );
     }
   }
 
@@ -199,24 +216,24 @@ class IUPB_LTI {
     $logged_out = FALSE;
 
     // if we do not have an external user_id skip account stuff.
-    if ( empty($_POST[IU_LTI_LOGIN_ID_POST_PARAM]) ) {
+    if ( empty($_POST[WISC_LTI_LOGIN_ID_POST_PARAM]) ) {
       return;
     }
 
     // Find user account (if any) with matching ID
     //E. Scull: Use login (username) instead of external id
-    //$user = IUPB_LTI::find_user_by_external_id( $_POST['user_id'] );
-    $user = IUPB_LTI::find_user_by_login( $_POST[IU_LTI_LOGIN_ID_POST_PARAM] );
+    //$user = WISCPB_LTI::find_user_by_external_id( $_POST['user_id'] );
+    $user = WISCPB_LTI::find_user_by_login( $_POST[WISC_LTI_LOGIN_ID_POST_PARAM] );
 
     //E. Scull: Moved here, was below the following is_user_logged_in() if block
     if ( empty($user) ) {
       // Create a user account if we do not have a matching account
-      $user = IUPB_LTI::create_user_account( $_POST[IU_LTI_LOGIN_ID_POST_PARAM] );
+      $user = WISCPB_LTI::create_user_account( $_POST[WISC_LTI_LOGIN_ID_POST_PARAM] );
     }
 
     //E. Scull - update user if any role. TODO: Go ahead and add first/last name when creating user. Why is this a separate function? Why only teachers?
-    //IUPB_LTI::update_user_if_teacher( $user );
-    IUPB_LTI::update_user( $user );
+    //WISCPB_LTI::update_user_if_teacher( $user );
+    WISCPB_LTI::update_user( $user );
 
 
 
@@ -236,15 +253,15 @@ class IUPB_LTI {
 
     // If the user is not currently logged in... authenticate as the matched account.
     if ( ! is_user_logged_in() || $logged_out ) {
-      IUPB_LTI::login_user_no_password( $user->ID );
+      WISCPB_LTI::login_user_no_password( $user->ID );
     }
 
     // Associate the user with this blog as a subscriber if not already associated.
     $blog = (int)$wp->query_vars['blog'];
     if ( ! empty( $blog ) && ! is_user_member_of_blog( $user->ID, $blog ) ) {
-      if( IUPB_LTI::is_lti_user_allowed_to_subscribe($blog)){
+      if( WISCPB_LTI::is_lti_user_allowed_to_subscribe($blog)){
         add_user_to_blog( $blog, $user->ID, 'subscriber');
-        IUPB_LTI::record_new_register($user, $blog);
+        WISCPB_LTI::record_new_register($user, $blog);
       }
     }
   }
@@ -253,20 +270,20 @@ class IUPB_LTI {
    * Checks if the settings of the book allow this user to subscribe
    * That means that either all LTI users are, or only teachers/admins
    *
-   * If the blog's IUPB_LTI_TEACHERS_ONLY option is 1 then only teachers
+   * If the blog's WISCPB_LTI_TEACHERS_ONLY option is 1 then only teachers
    * are allowed
    *
    * @param $blog
    */
   public static function is_lti_user_allowed_to_subscribe($blog){
-    $role = IUPB_LTI::highest_lti_context_role();
+    $role = WISCPB_LTI::highest_lti_context_role();
     if( $role == 'admin' || $role == 'teacher' ) {
       return true;
     } else {
       // Switch to the target blog to get the correct option value
       $curr = get_current_blog_id();
       switch_to_blog($blog);
-      $teacher_only = get_option(IUPB_LTI_TEACHERS_ONLY);
+      $teacher_only = get_option(WISCPB_LTI_TEACHERS_ONLY);
       switch_to_blog($curr);
 
       return $teacher_only != 1;
@@ -289,10 +306,10 @@ class IUPB_LTI {
       return $existing_user;
     }
     else {
-      $password = wp_generate_password( IUPB_LTI_PASSWORD_LENGTH, true);
+      $password = wp_generate_password( WISCPB_LTI_PASSWORD_LENGTH, true);
 
       //E. Scull: TODO, add user's name and other details here too. 
-      $user_id = wp_create_user( $username, $password, IUPB_LTI::default_lti_email($username) );
+      $user_id = wp_create_user( $username, $password, WISCPB_LTI::default_lti_email($username) );
 
       $user = new WP_User( $user_id );
       $user->set_role( 'subscriber' );
@@ -313,7 +330,7 @@ class IUPB_LTI {
     }
 
     $data = array(
-        "lti_user_id"=>$_POST[IU_LTI_LOGIN_ID_POST_PARAM],
+        "lti_user_id"=>$_POST[WISC_LTI_LOGIN_ID_POST_PARAM],
         "lti_context_id"=>$_POST['context_id'],
         "lti_context_name"=>$_POST['context_title'],
         "lti_school_id"=>$_POST['tool_consumer_instance_guid'],
@@ -322,7 +339,7 @@ class IUPB_LTI {
         "timestamp"=>time(),
     );
 
-    //$role = IUPB_LTI::highest_lti_context_role();
+    //$role = WISCPB_LTI::highest_lti_context_role();
 
     //if ( $role == 'admin' || $role == 'teacher' ) {
       if ( !empty( $_POST['lis_person_name_given'] ) ) {
@@ -338,17 +355,15 @@ class IUPB_LTI {
 
     $curr = get_current_blog_id();
     switch_to_blog($blog);
-    update_user_option( $user->ID, IUPB_LTI_USERMETA_ENROLLMENT, $data );
+    update_user_option( $user->ID, WISCPB_LTI_USERMETA_ENROLLMENT, $data );
     switch_to_blog($curr);
   }
 
 
 
-  // E. Scull: TODO, if we are allowing IU guest accounts, we need to do some more work here 
-  // since the numeric user ID won't work for the email (i.e. 80000945605@iu.edu)
   // Should use email from LTI instead?
   public static function default_lti_email( $username ) {
-    return $username . '@' . IU_DEFAULT_EMAIL_DOMAIN;
+    return $username . '@' . WISC_DEFAULT_EMAIL_DOMAIN;
   }
 
   /**
@@ -403,7 +418,7 @@ class IUPB_LTI {
    * @return string admin|teacher|designer|ta|learner|other
    */
   public static function highest_lti_context_role(){
-    $roles = IUPB_LTI::get_current_launch_roles();
+    $roles = WISCPB_LTI::get_current_launch_roles();
     if (in_array('urn:lti:instrole:ims/lis/Administrator', $roles) || in_array('Administrator', $roles)):
       return "admin";
     elseif (in_array('urn:lti:role:ims/lis/Instructor', $roles) || in_array('Instructor', $roles)):
@@ -448,7 +463,7 @@ class IUPB_LTI {
    * Add our LTI api endpoint vars so that wordpress "understands" them.
    */
   public static function query_vars( $query_vars ) {
-    $query_vars[] = '__iupblti';
+    $query_vars[] = '__wiscpblti';
     $query_vars[] = 'resource_link_id';
     $query_vars[] = 'target_action';
     $query_vars[] = 'page_title';
@@ -456,7 +471,7 @@ class IUPB_LTI {
     $query_vars[] = 'action';
     $query_vars[] = 'ID';
     $query_vars[] = 'context_id';
-    $query_vars[] = 'iupb-lti-nonce';
+    $query_vars[] = 'wiscpb-lti-nonce';
     $query_vars[] = 'custom_page_id';
     $query_vars[] = 'ext_post_message_navigation';
 
@@ -469,24 +484,24 @@ class IUPB_LTI {
    */
   public static function update_db() {
     switch_to_blog(1);
-    $version = get_option( 'iupb_lti_db_version', '');
+    $version = get_option( 'wiscpb_lti_db_version', '');
     restore_current_blog();
 
     if (empty($version) || $version == '1.0') {
       $meta_type = 'user';
       $user_id = 0; // ignored since delete all = TRUE
-      $meta_key = 'iupblti_lti_info';
+      $meta_key = 'wiscpblti_lti_info';
       $meta_value = ''; // ignored
       $delete_all = TRUE;
       delete_metadata( $meta_type, $user_id, $meta_key, $meta_value, $delete_all );
 
       switch_to_blog(1);
-      update_option( 'iupb_lti_db_version', IUPB_LTI_DB_VERSION );
+      update_option( 'wiscpb_lti_db_version', WISCPB_LTI_DB_VERSION );
       restore_current_blog();
     }
     if ( $version == '1.1' ) {
       // This also updates the table.
-      IUPB_LTI::create_db_table();
+      WISCPB_LTI::create_db_table();
     }
   }
 
@@ -494,7 +509,7 @@ class IUPB_LTI {
    * Add our LTI resource_link_id mapping api endpoint
    */
   public static function add_rewrite_rule() {
-    add_rewrite_rule( '^api/iupblti?(.*)', 'index.php?__iupblti=1&$matches[1]', 'top');
+    add_rewrite_rule( '^api/wiscpblti?(.*)', 'index.php?__wiscpblti=1&$matches[1]', 'top');
   }
 
   /**
@@ -503,8 +518,8 @@ class IUPB_LTI {
   public static function setup_capabilities() {
     global $wp_roles;
 
-    $wp_roles->add_cap('administrator', IUPB_LTI_CAP_LINK_LTI);
-    $wp_roles->add_cap('editor', IUPB_LTI_CAP_LINK_LTI);
+    $wp_roles->add_cap('administrator', WISCPB_LTI_CAP_LINK_LTI);
+    $wp_roles->add_cap('editor', WISCPB_LTI_CAP_LINK_LTI);
   }
 
   /**
@@ -515,13 +530,13 @@ class IUPB_LTI {
   public static function parse_request() {
     global $wp, $wpdb;
 
-    if ( IUPB_LTI::user_can_map_lti_links() && isset( $wp->query_vars['__iupblti'] ) && !empty($wp->query_vars['__iupblti'] ) ) {
+    if ( WISCPB_LTI::user_can_map_lti_links() && isset( $wp->query_vars['__wiscpblti'] ) && !empty($wp->query_vars['__wiscpblti'] ) ) {
       // Process adding link associations
-      if ( wp_verify_nonce($wp->query_vars['iupb-lti-nonce'], 'mapping-lti-link') &&
+      if ( wp_verify_nonce($wp->query_vars['wiscpb-lti-nonce'], 'mapping-lti-link') &&
            ! empty( $wp->query_vars['resource_link_id']) &&
            ! empty( $wp->query_vars['target_action'] ) ) {
         // Update db record everything is valid
-        $map = IUPB_LTI::get_lti_map($wp->query_vars['resource_link_id'] );
+        $map = WISCPB_LTI::get_lti_map($wp->query_vars['resource_link_id'] );
 
         $current_user = wp_get_current_user();
         $values = array(
@@ -541,11 +556,11 @@ class IUPB_LTI {
           // update the existing map.
           $where = array( 'resource_link_id' => $wp->query_vars['resource_link_id'] );
           $where_format = array( '%s' );
-          $result = $wpdb->update(IUPB_LTI_TABLE, $values, $where, $value_format, $where_format );
+          $result = $wpdb->update(WISCPB_LTI_TABLE, $values, $where, $value_format, $where_format );
         }
         else {
           // map was empty... insert the new map.
-          $result = $wpdb->insert(IUPB_LTI_TABLE, $values, $value_format );
+          $result = $wpdb->insert(WISCPB_LTI_TABLE, $values, $value_format );
         }
 
         if ( $result === FALSE ) {
@@ -555,11 +570,11 @@ class IUPB_LTI {
       }
 
       // Process action items.
-      if ( wp_verify_nonce($wp->query_vars['iupb-lti-nonce'], 'unmapping-lti-link') && ! empty( $wp->query_vars['action'] ) ) {
+      if ( wp_verify_nonce($wp->query_vars['wiscpb-lti-nonce'], 'unmapping-lti-link') && ! empty( $wp->query_vars['action'] ) ) {
         switch ( $wp->query_vars['action'] ) {
           case 'delete':
             if ( !empty($wp->query_vars['ID'] && is_numeric($wp->query_vars['ID']))) {
-              $wpdb->delete( IUPB_LTI_TABLE, array( 'ID' => $wp->query_vars['ID'] ) );
+              $wpdb->delete( WISCPB_LTI_TABLE, array( 'ID' => $wp->query_vars['ID'] ) );
             }
             break;
         }
@@ -598,11 +613,11 @@ class IUPB_LTI {
       // Make sure query is ran against primary site since usermeta was set via
       // lti_setup action.
       switch_to_blog(1);
-      $resource_link_id = get_user_meta( $current_user->ID, IUPB_LTI_USERMETA_LASTLINK, TRUE );
+      $resource_link_id = get_user_meta( $current_user->ID, WISCPB_LTI_USERMETA_LASTLINK, TRUE );
       restore_current_blog();
     }
 
-    $table_name = IUPB_LTI_TABLE;
+    $table_name = WISCPB_LTI_TABLE;
     $sql = $wpdb->prepare("SELECT * FROM $table_name WHERE resource_link_id  = %s", $resource_link_id);
 
     $map = $wpdb->get_row( $sql );
@@ -623,7 +638,7 @@ class IUPB_LTI {
       $target_action = get_permalink();
     }
 
-    $table_name = IUPB_LTI_TABLE;
+    $table_name = WISCPB_LTI_TABLE;
     $sql = $wpdb->prepare("SELECT * FROM $table_name WHERE target_action = %s", $target_action);
     return $wpdb->get_results($sql);
   }
@@ -634,11 +649,11 @@ class IUPB_LTI {
    */
   public static function content_map_lti_launch( $content ) {
     if ( is_single()
-        && IUPB_LTI::user_can_map_lti_links()
+        && WISCPB_LTI::user_can_map_lti_links()
         && empty($wp->query_vars['page_title'])
         && ! isset($_GET['content_only']) ) {
 
-      $map = IUPB_LTI::get_lti_map();
+      $map = WISCPB_LTI::get_lti_map();
       $target_action = get_permalink();
       $resource_link_id = '';
       $links = array();
@@ -648,16 +663,16 @@ class IUPB_LTI {
         // Map is either not set at all or needs to be set, inject content to do so.
         $text = __('Add LTI link');
         $hover = __('resource_link_id(##RES##)');
-        $url = get_site_url(1) . '/api/iupblti';
-        $url = wp_nonce_url($url, 'mapping-lti-link', 'iupb-lti-nonce');
+        $url = get_site_url(1) . '/api/wiscpblti';
+        $url = wp_nonce_url($url, 'mapping-lti-link', 'wiscpb-lti-nonce');
         $url .= '&resource_link_id=' . urlencode($map->resource_link_id) . '&target_action=' . urlencode( $target_action ) . '&blog=' . get_current_blog_id();
         $links['add'] = '<div class="lti addmap"><a class="btn blue" href="' . $url . '" title="' . esc_attr( str_replace('##RES##', $map->resource_link_id, $hover) ) . '">' . $text . '</a></div>';
       }
 
-      $maps = IUPB_LTI::get_maps_by_target_action();
+      $maps = WISCPB_LTI::get_maps_by_target_action();
       if ( ! empty( $maps ) ) {
-        $base_url = get_site_url(1) . '/api/iupblti';
-        $base_url = wp_nonce_url($base_url, 'unmapping-lti-link', 'iupb-lti-nonce');
+        $base_url = get_site_url(1) . '/api/wiscpblti';
+        $base_url = wp_nonce_url($base_url, 'unmapping-lti-link', 'wiscpb-lti-nonce');
         $text = __('Remove LTI link');
         $hover = __('resource_link_id(##RES##)');
         foreach ( $maps as $map ) {
@@ -692,7 +707,7 @@ class IUPB_LTI {
 
     if ( is_user_logged_in() ) {
       $current_user = wp_get_current_user();
-      if ( $current_user->has_cap(IUPB_LTI_CAP_LINK_LTI) ) {
+      if ( $current_user->has_cap(WISCPB_LTI_CAP_LINK_LTI) ) {
         if ( $switched ) {
           restore_current_blog();
         }
@@ -709,7 +724,7 @@ class IUPB_LTI {
    * Create a database table for storing LTI maps, this is a global table.
    */
   public static function create_db_table() {
-    $table_name = IUPB_LTI_TABLE;
+    $table_name = WISCPB_LTI_TABLE;
 
     $sql = "CREATE TABLE $table_name (
       ID mediumint(9) NOT NULL AUTO_INCREMENT,
@@ -720,11 +735,27 @@ class IUPB_LTI {
       PRIMARY KEY  (id),
       UNIQUE KEY resource_link_id (resource_link_id(32))
     );";
+
     require_once( ABSPATH . 'wp-admin/includes/upgrade.php');
     dbDelta( $sql );
 
+
+    $outcome_table_name = WISC_OUTCOMES_TABLE;
+    $outcomesql = "CREATE TABLE $outcome_table_name (
+      ID mediumint(9) NOT NULL AUTO_INCREMENT,
+      outcome_service_url LONGTEXT,
+      outcome_source_id LONGTEXT,
+      page_id mediumint(9),
+      user_id mediumint(9),
+      blog_id mediumint(9),
+      PRIMARY KEY  (id),
+      UNIQUE KEY outcome_element (page_id, user_id, blog_id)
+    );";
+
+    dbDelta($outcomesql);
+
     switch_to_blog(1);
-    update_option( 'iupb_lti_db_version', IUPB_LTI_DB_VERSION );
+    update_option( 'wiscpb_lti_db_version', WISCPB_LTI_DB_VERSION );
     restore_current_blog();
   }
 
@@ -733,9 +764,113 @@ class IUPB_LTI {
    */
   public static function remove_db_table() {
     global $wpdb;
-    $table_name = IUPB_LTI_TABLE;
+    $table_name = WISCPB_LTI_TABLE;
     $wpdb->query("DROP TABLE IF EXISTS $table_name");
-    delete_option('iupb_lti_db_version');
+    delete_option('wiscpb_lti_db_version');
   }
+
+  public static function save_outcome_info($url, $page, $user, $blogid, $sourceid){
+      global $wpdb;
+
+      $table = WISC_OUTCOMES_TABLE;
+      $values = array(
+          'outcome_service_url' => $url,
+          'page_id' => $page,
+          'outcome_source_id' => $sourceid,
+          'user_id' => $user,
+          'blog_id' => $blogid,
+      );
+
+      $wpdb->replace($table, $values);
+
+  }
+
+  public static function sendGrade($grade, $userid, $page_id, $blog_id){
+      global $wpdb;
+
+      $table_name = WISC_OUTCOMES_TABLE;
+      $sql = $wpdb->prepare("SELECT * FROM $table_name WHERE page_id  = %s AND user_id = %s AND blog_id = %s", $page_id, $userid, $blog_id);
+
+      $outcome_info = $wpdb->get_row( $sql );
+      self::sendPOXGrade($grade, $outcome_info->outcome_source_id, $outcome_info->outcome_service_url);
+  }
+
+  public static function sendPOXGrade($grade, $sourceid, $outcome_url){
+      global $wpdb;
+
+      $content_type = "application/xml";
+      $sourceid = htmlspecialchars($sourceid);
+
+      $postBody = str_replace(
+          array('SOURCEDID', 'GRADE', 'OPERATION','MESSAGE'),
+          array($sourceid, $grade.'', 'replaceResultRequest', uniqid()),
+          self::getPOXGradeRequest());
+
+      $sql = $wpdb->prepare("SELECT * FROM wp_postmeta WHERE meta_key = %s", _lti_consumer_key);
+      $consumer_key = $wpdb->get_row($sql);
+
+      $sql = $wpdb->prepare("SELECT * FROM wp_postmeta WHERE meta_key = %s", _lti_consumer_secret);
+      $consumer_secret = $wpdb->get_row($sql);
+
+      $response = self::sendOAuthBody("POST", $outcome_url, $consumer_key->meta_value, $consumer_secret->meta_value,
+          $content_type, $postBody);
+  }
+
+    public static function getPOXGradeRequest() {
+        return '<?xml version = "1.0" encoding = "UTF-8"?>
+    <imsx_POXEnvelopeRequest xmlns = "http://www.imsglobal.org/services/ltiv1p1/xsd/imsoms_v1p0">
+      <imsx_POXHeader>
+        <imsx_POXRequestHeaderInfo>
+          <imsx_version>V1.0</imsx_version>
+          <imsx_messageIdentifier>MESSAGE</imsx_messageIdentifier>
+        </imsx_POXRequestHeaderInfo>
+      </imsx_POXHeader>
+      <imsx_POXBody>
+        <OPERATION>
+          <resultRecord>
+            <sourcedGUID>
+              <sourcedId>SOURCEDID</sourcedId>
+            </sourcedGUID>
+            <result>
+              <resultScore>
+                <language>en-us</language>
+                <textString>GRADE</textString>
+              </resultScore>
+            </result>
+          </resultRecord>
+        </OPERATION>
+      </imsx_POXBody>
+    </imsx_POXEnvelopeRequest>';
+    }
+
+
+    public static function sendOAuthBody($method, $endpoint, $oauth_consumer_key, $oauth_consumer_secret,
+                                         $content_type, $body, $more_headers=false, $signature=false)
+    {
+        $files = glob( ABSPATH . 'wp-content/plugins/wiscpb-lti/OAuth/*.php');
+        foreach ($files as $file) {
+            require($file);
+        }
+        require_once (ABSPATH . '/wp-content/plugins/wiscpb-lti/Net.php');
+
+        $hmac_method = new OAuthSignatureMethod_HMAC_SHA1();
+        $hash = base64_encode(sha1($body, TRUE));
+
+        $parms = array('oauth_body_hash' => $hash);
+        $test_token = '';
+        $test_consumer = new OAuthConsumer($oauth_consumer_key, $oauth_consumer_secret, NULL);
+        $acc_req = OAuthRequest::from_consumer_and_token($test_consumer, $test_token, $method, $endpoint, $parms);
+        $acc_req->sign_request($hmac_method, $test_consumer, $test_token);
+        // Pass this back up "out of band" for debugging
+        global $LastOAuthBodyBaseString;
+        $LastOAuthBodyBaseString = $acc_req->get_signature_base_string();
+        $header = $acc_req->to_header();
+        $header = $header . "\r\nContent-Type: " . $content_type . "\r\n";
+        if ( $more_headers === false ) $more_headers = array();
+        foreach ($more_headers as $more ) {
+            $header = $header . $more . "\r\n";
+        }
+        return Net::doBody($endpoint, $method, $body,$header);
+    }
 
 }
