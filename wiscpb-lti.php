@@ -792,6 +792,7 @@ class WISCPB_LTI {
       $sql = $wpdb->prepare("SELECT * FROM $table_name WHERE page_id  = %s AND user_id = %s AND blog_id = %s", $page_id, $userid, $blog_id);
 
       $outcome_info = $wpdb->get_row( $sql );
+      echo $outcome_info;
       self::sendPOXGrade($grade, $outcome_info->outcome_source_id, $outcome_info->outcome_service_url);
   }
 
