@@ -811,7 +811,8 @@ class WISCPB_LTI {
 
       $sql = $wpdb->prepare("SELECT * FROM wp_postmeta WHERE meta_key = %s", _lti_consumer_secret);
       $consumer_secret = $wpdb->get_row($sql);
-
+      echo "".$consumer_key->meta_value;
+      echo "\n".$consumer_secret->meta_value;
       $response = self::sendOAuthBody("POST", $outcome_url, $consumer_key->meta_value, $consumer_secret->meta_value,
           $content_type, $postBody);
       echo "".$response;
