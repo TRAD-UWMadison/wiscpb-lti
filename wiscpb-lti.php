@@ -806,6 +806,7 @@ class WISCPB_LTI {
           array($sourceid, $grade.'', 'replaceResultRequest', uniqid()),
           self::getPOXGradeRequest());
 
+      echo $postBody;
       $sql = $wpdb->prepare("SELECT * FROM upbhbe_postmeta WHERE meta_key = %s", _lti_consumer_key);
       $consumer_key = $wpdb->get_row($sql);
 
