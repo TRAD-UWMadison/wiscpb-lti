@@ -787,7 +787,7 @@ class WISCPB_LTI {
 
   public static function sendGrade($grade, $userid, $page_id, $blog_id){
       global $wpdb;
-
+      echo "start sendGrade";
       $table_name = WISC_OUTCOMES_TABLE;
       $sql = $wpdb->prepare("SELECT * FROM $table_name WHERE page_id  = %s AND user_id = %s AND blog_id = %s", $page_id, $userid, $blog_id);
 
