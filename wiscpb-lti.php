@@ -792,7 +792,6 @@ class WISCPB_LTI {
       $sql = $wpdb->prepare("SELECT * FROM $table_name WHERE page_id  = %s AND user_id = %s AND blog_id = %s", $page_id, $userid, $blog_id);
 
       $outcome_info = $wpdb->get_row( $sql );
-      echo "".$outcome_info->outcome_source_id;
       self::sendPOXGrade($grade, $outcome_info->outcome_source_id, $outcome_info->outcome_service_url);
   }
 
@@ -815,6 +814,7 @@ class WISCPB_LTI {
 
       $response = self::sendOAuthBody("POST", $outcome_url, $consumer_key->meta_value, $consumer_secret->meta_value,
           $content_type, $postBody);
+      echo "".$response;
   }
 
     public static function getPOXGradeRequest() {
