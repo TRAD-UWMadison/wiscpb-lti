@@ -787,7 +787,6 @@ class WISCPB_LTI {
 
   public static function sendGrade($grade, $userid, $page_id, $blog_id){
       global $wpdb;
-      echo "start sendGrade";
       $table_name = WISC_OUTCOMES_TABLE;
       $sql = $wpdb->prepare("SELECT * FROM $table_name WHERE page_id  = %s AND user_id = %s AND blog_id = %s", $page_id, $userid, $blog_id);
 
@@ -806,17 +805,17 @@ class WISCPB_LTI {
           array($sourceid, $grade.'', 'replaceResultRequest', uniqid()),
           self::getPOXGradeRequest());
 
-      echo $postBody;
-      $sql = $wpdb->prepare("SELECT * FROM upbhbe_postmeta WHERE meta_key = %s", _lti_consumer_key);
+      $table_name = $wpdb->base_prefix . "postmeta";
+      $sql = $wpdb->prepare("SELECT * FROM ". $table_name ." WHERE meta_key = %s", _lti_consumer_key);
       $consumer_key = $wpdb->get_row($sql);
 
-      $sql = $wpdb->prepare("SELECT * FROM upbhbe_postmeta WHERE meta_key = %s", _lti_consumer_secret);
+      $sql = $wpdb->prepare("SELECT * FROM ".$table_name." WHERE meta_key = %s", _lti_consumer_secret);
       $consumer_secret = $wpdb->get_row($sql);
-      echo "".$consumer_key->meta_value;
-      echo "\n".$consumer_secret->meta_value;
+
+
       $response = self::sendOAuthBody("POST", $outcome_url, $consumer_key->meta_value, $consumer_secret->meta_value,
           $content_type, $postBody);
-      echo "".$response;
+
   }
 
     public static function getPOXGradeRequest() {
