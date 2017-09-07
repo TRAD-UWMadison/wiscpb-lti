@@ -8,15 +8,16 @@
  * Author URI:        
  * Text Domain:       lti
  * License:           MIT
+ * Network: True
  * GitHub Plugin URI: 
  */
 
-namespace WiscLTI;
+//namespace WiscLTI;
 
 use \WiscLTI\OAuth\OAuthSignatureMethod_HMAC_SHA1;
 use \WiscLTI\OAuth\OAuthConsumer;
 use \WiscLTI\OAuth\OAuthRequest;
-use WiscLTI\Util\Net;
+use \WiscLTI\Util\Net;
 
 
 // If file is called directly, abort.
@@ -40,6 +41,7 @@ class WISCPB_LTI {
 
     //E. Scull: Add new constants ======================================
     define('WISC_LTI_LOGIN_ID_POST_PARAM', 'custom_canvas_user_login_id');
+    define('WISC_LTI_LOGIN_EMAIL_POST_PARAM', 'lis_person_contact_email_primary');
     define('WISC_DEFAULT_EMAIL_DOMAIN', 'wisc.edu');
     define('WISC_OUTCOMES_TABLE', 'wp_wiscltioutcomes');
     // =================================================================
@@ -52,6 +54,7 @@ class WISCPB_LTI {
     add_action( 'init', array( __CLASS__, 'setup_capabilities' ) );
     add_action( 'query_vars', array( __CLASS__, 'query_vars' ) );
     add_action( 'parse_request', array( __CLASS__, 'parse_request' ) );
+    add_action('add_meta_boxes', array(__CLASS__,'addLTILink'));
 
     // Respond to LTI launches
     add_action( 'lti_setup', array( __CLASS__, 'lti_setup' ) );
@@ -65,13 +68,44 @@ class WISCPB_LTI {
     add_option( WISCPB_LTI_TEACHERS_ONLY, false );
 	}
 
+	function addLTILink($post){
+        add_meta_box( 'lti_meta_box', __( 'LTI Information', 'lti_meta' ), array(__CLASS__, 'build_lti_link'), 'post', 'normal', 'low');
+        add_meta_box( 'lti_meta_box', __( 'LTI Information', 'lti_meta' ), array(__CLASS__, 'build_lti_link'), 'page', 'normal', 'low');
+
+
+    }
+
+    function build_lti_link(){
+        global $wpdb;
+        $current_blog = get_current_blog_id();
+
+        switch_to_blog(1);
+        $table_name = $wpdb->base_prefix . "postmeta";
+        $sql = $wpdb->prepare("SELECT * FROM ". $table_name ." WHERE meta_key = %s", _lti_consumer_key);
+        $consumer_key = $wpdb->get_row($sql);
+
+        $sql = $wpdb->prepare("SELECT * FROM ".$table_name." WHERE meta_key = %s", _lti_consumer_secret);
+        $consumer_secret = $wpdb->get_row($sql);
+
+        switch_to_blog($current_blog);
+        $post_id = get_the_ID();
+        $link = get_home_url(1) .'/api/lti/'.$current_blog.'?page_id='.$post_id;
+
+//	    echo $consumer_key;
+        echo '<div>
+                LTI Link: <strong>'.$link.'</strong></br>
+                Consumer Key: <strong>'. $consumer_key->meta_value . '</strong></br>
+                Consumer Secret: <strong>' . $consumer_secret->meta_value. '</strong>
+            </div>';
+    }
+
   /**
    * Ensure all dependencies are set and available.
    */
   public static function activate() {
     // Require lti plugin
-    if ( ! is_plugin_active( 'lti/lti.php' ) and current_user_can( 'activate_plugins' ) ) {
-      wp_die('This plugin requires the LTI plugin to be installed and active. <br /><a href="' . admin_url( 'plugins.php' ) . '">&laquo; Return to Plugins</a>');' )';
+    if ( ! is_plugin_active( 'lti/lti.php' ) and current_user_can( 'activate_plugins' ) and !is_multisite()) {
+      wp_die('This plugin requires a multisite instance and the LTI plugin to be installed and active. <br /><a href="' . admin_url( 'plugins.php' ) . '">&laquo; Return to Plugins</a>');' )';
     }
 
     WISCPB_LTI::create_db_table();
@@ -228,7 +262,7 @@ class WISCPB_LTI {
     //E. Scull: Moved here, was below the following is_user_logged_in() if block
     if ( empty($user) ) {
       // Create a user account if we do not have a matching account
-      $user = WISCPB_LTI::create_user_account( $_POST[WISC_LTI_LOGIN_ID_POST_PARAM] );
+      $user = WISCPB_LTI::create_user_account( $_POST[WISC_LTI_LOGIN_ID_POST_PARAM], $_POST[WISC_LTI_LOGIN_EMAIL_POST_PARAM] );
     }
 
     //E. Scull - update user if any role. TODO: Go ahead and add first/last name when creating user. Why is this a separate function? Why only teachers?
@@ -300,17 +334,16 @@ class WISCPB_LTI {
    * @todo consider using 'lis_person_contact_email_primary' if passed as email.
    * @return the newly created user account.
    */
-  public static function create_user_account( $username ) {
+  public static function create_user_account( $username, $email ) {
     $existing_user = get_user_by('login', $username);
     if ( ! empty($existing_user) ) {
       return $existing_user;
     }
     else {
-      $password = wp_generate_password( WISCPB_LTI_PASSWORD_LENGTH, true);
+        $password = wp_generate_password( WISCPB_LTI_PASSWORD_LENGTH, true);
 
       //E. Scull: TODO, add user's name and other details here too. 
-      $user_id = wp_create_user( $username, $password, WISCPB_LTI::default_lti_email($username) );
-
+      $user_id = wp_create_user( $username, $password, $email );
       $user = new WP_User( $user_id );
       $user->set_role( 'subscriber' );
 
@@ -771,7 +804,9 @@ class WISCPB_LTI {
 
   public static function save_outcome_info($url, $page, $user, $blogid, $sourceid){
       global $wpdb;
-
+      if (is_null($blogid)){
+          $blogid = -1;
+      }
       $table = WISC_OUTCOMES_TABLE;
       $values = array(
           'outcome_service_url' => $url,
