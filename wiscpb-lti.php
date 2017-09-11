@@ -241,8 +241,7 @@ class WISCPB_LTI {
    * required.
    */
   public static function lti_accounts() {
-
-    global $wp;
+      global $wp;
 
     // Used to track if we call wp_logout() since is_user_logged_in() will still
     // report true after our call to that.
@@ -336,6 +335,7 @@ class WISCPB_LTI {
    */
   public static function create_user_account( $username, $email ) {
     $existing_user = get_user_by('login', $username);
+
     if ( ! empty($existing_user) ) {
       return $existing_user;
     }
@@ -343,10 +343,14 @@ class WISCPB_LTI {
         $password = wp_generate_password( WISCPB_LTI_PASSWORD_LENGTH, true);
 
       //E. Scull: TODO, add user's name and other details here too. 
-      $user_id = wp_create_user( $username, $password, $email );
+      $user_id = wp_create_user( $username, $password, $username );
       $user = new WP_User( $user_id );
       $user->set_role( 'subscriber' );
-
+//        echo $username.'<br>';
+//        echo $email.'<br>';
+//        echo $password.'<br>';
+//        echo $user_id->get_error_message().'<br>';
+//        die();
       return $user;
     }
   }
