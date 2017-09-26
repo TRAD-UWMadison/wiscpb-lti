@@ -830,6 +830,7 @@ class WISCPB_LTI {
       $sql = $wpdb->prepare("SELECT * FROM $table_name WHERE page_id  = %s AND user_id = %s AND blog_id = %s", $page_id, $userid, $blog_id);
 
       $outcome_info = $wpdb->get_row( $sql );
+      if (is_null($outcome_info->outcome_source_id)) return;
       self::sendPOXGrade($grade, $outcome_info->outcome_source_id, $outcome_info->outcome_service_url);
   }
 
@@ -890,7 +891,7 @@ class WISCPB_LTI {
     {
         $files = glob( ABSPATH . 'wp-content/plugins/wiscpb-lti/OAuth/*.php');
         foreach ($files as $file) {
-            require($file);
+            require_once($file);
         }
         require_once (ABSPATH . '/wp-content/plugins/wiscpb-lti/Net.php');
 
