@@ -31,6 +31,10 @@ class WISCPB_LTI {
    * Takes care of registering our hooks and setting constants.
    */
   public static function init() {
+    if (isset($_GET['content_only'])) {
+       wp_enqueue_style('wisc-lti-nav', plugins_url('no-navigation.css', __FILE__));
+    }
+
     // Table name is always root (site)
     define('WISCPB_LTI_TABLE', 'wp_wiscpblti');
     define('WISCPB_LTI_DB_VERSION', '1.2');
