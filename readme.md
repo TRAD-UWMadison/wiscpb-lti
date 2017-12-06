@@ -1,9 +1,10 @@
-# IU Pressbooks LTI
+# Wisc Pressbooks LTI
 
-LTI Integration for Pressbooks at IU. Based on the Candela LTI integration from Lumen Learning (https://github.com/lumenlearning/candela-lti). 
+LTI Integration for Pressbooks at UW. Based on the UI Fork of the Candela LTI integration from Lumen Learning (https://github.com/lumenlearning/candela-lti). 
 Primary differences:
 
 - Looks for a specified custom LTI parameter to use for the WordPress login id (instead of using the generated LTI user id)
+- Allow for grades to be passed back through LTI 1.1 spec
 
 
 ## Requirements
@@ -22,17 +23,3 @@ Then restart Apache with:
 
 	sudo service apache2 restart
 
-
-## Publishing to IU's Unizin-hosted dev instance of Pressbooks.
-
-### SSH shell connection
-
-Public SSH key and IP address must be supplied to Unizin to whitelist an SSH connection to the server. Then SSH connections can be made from a shell terminal:
-
-	ssh -i <path to your private key file> ubuntu@54.212.234.236
-
-### SCP (file transfer)
-
-Uploading files from your local machine to the server can be done using SCP (also requires the SSH key). Note that the local path is to the specific plugin's folder and the remote path is to the root of the plugins folder.
-
-	scp -i <path your private key file> -r <local-path-of-the-specific-plugin-root> ubuntu@54.212.234.236:/var/www/iu-dev/wordpress/wp-content/plugins/
