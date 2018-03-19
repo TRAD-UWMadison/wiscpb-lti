@@ -2,8 +2,8 @@
 /**
  * @wordpress-plugin
  * Plugin Name:       Wisc Pressbooks LTI
- * Description:       LTI Integration for Pressbooks at UW-Madison. Based on the Candela LTI integration from Lumen Learning, but looks for a specified custom LTI parameter to use for the WordPress login id (instead of using the generated LTI user id)
- * Version:           0.1
+ * Description:       LTI Integration for Pressbooks and Grassblade at UW-Madison. Based on the Candela LTI integration from Lumen Learning, but looks for a specified custom LTI parameter to use for the WordPress login id (instead of using the generated LTI user id)
+ * Version:           0.2.0
  * Author:            UW-Madison Learning Solutions 
  * Author URI:        
  * Text Domain:       lti
@@ -67,6 +67,8 @@ class WISCPB_LTI {
     add_action('lti_outcome', array(__CLASS__, 'sendGrade'), 10, 4);
 
 //    add_action('admin_menu', array( __CLASS__, 'admin_menu'));
+
+    add_action('wp', array(__CLASS__, 'restrict_access'));
 
     define('WISCPB_LTI_TEACHERS_ONLY', 'wiscpb_lti_teachers_only');
     add_option( WISCPB_LTI_TEACHERS_ONLY, false );
@@ -157,6 +159,20 @@ class WISCPB_LTI {
     WISCPB_LTI::remove_db_table();
   }
 
+  public static function restrict_access(){
+      global $wp_query;
+      if (current_user_can('edit_posts') || isset($_REQUEST['lti_context_id'])){
+          return;
+      } else {
+          // Not through LTI or an editing user, redirect to 403
+          global $wp_query;
+          $wp_query->set_403();
+          status_header( 403 );
+          get_template_part( 403 ); exit();
+      }
+
+  }
+
   /**
    * Responder for action lti_launch.
    */
@@ -167,7 +183,6 @@ class WISCPB_LTI {
       WISCPB_LTI::save_outcome_info($_POST['lis_outcome_service_url'],
           $wp->query_vars['page_id'],
           $current_user->ID, $wp->query_vars['blog'], $_POST["lis_result_sourcedid"]);
-
 //      WISCPB_LTI::sendGrade(.5, $current_user->ID, $wp->query_vars['page_id'], $wp->query_vars['blog']);
     // allows deep links with an LTI launch urls like:
     // <wiscpb>/api/lti/BLOGID?page_title=page_name
