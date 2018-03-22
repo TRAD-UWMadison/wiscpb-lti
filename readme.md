@@ -1,4 +1,4 @@
-# Wisc Pressbooks LTI
+# Wisc Content Auth LTI
 
 LTI Integration for Pressbooks at UW. Based on the UI Fork of the Candela LTI integration from Lumen Learning (https://github.com/lumenlearning/candela-lti). 
 Primary differences:

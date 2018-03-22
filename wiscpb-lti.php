@@ -4,7 +4,7 @@
  * Plugin Name:       Wisc Content Auth LTI
  * Description:       LTI Integration for Pressbooks and Grassblade at UW-Madison. Based on the Candela LTI integration from Lumen Learning, but looks for a specified custom LTI parameter to use for the WordPress login id (instead of using the generated LTI user id)
  * Version:           0.2.0
- * Author:            UW-Madison Learning Solutions 
+ * Author:            UW-Madison Learning Solutions
  * Author URI:
  * Text Domain:       lti
  * License:           MIT
