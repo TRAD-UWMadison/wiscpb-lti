@@ -5,11 +5,11 @@
  * Description:       LTI Integration for Pressbooks and Grassblade at UW-Madison. Based on the Candela LTI integration from Lumen Learning, but looks for a specified custom LTI parameter to use for the WordPress login id (instead of using the generated LTI user id)
  * Version:           0.2.0
  * Author:            UW-Madison Learning Solutions 
- * Author URI:        
+ * Author URI:
  * Text Domain:       lti
  * License:           MIT
  * Network: True
- * GitHub Plugin URI: 
+ * GitHub Plugin URI:
  */
 
 //namespace WiscLTI;
@@ -74,23 +74,23 @@ class WISCPB_LTI {
     add_option( WISCPB_LTI_TEACHERS_ONLY, false );
 	}
 
-	function addLTILink($post){
+  public static function addLTILink($post){
         add_meta_box( 'lti_meta_box', __( 'LTI Information', 'lti_meta' ), array(__CLASS__, 'build_lti_link'), 'post', 'normal', 'low');
         add_meta_box( 'lti_meta_box', __( 'LTI Information', 'lti_meta' ), array(__CLASS__, 'build_lti_link'), 'page', 'normal', 'low');
 
 
     }
 
-    function build_lti_link(){
+  public static function build_lti_link(){
         global $wpdb;
         $current_blog = get_current_blog_id();
 
         switch_to_blog(1);
         $table_name = $wpdb->base_prefix . "postmeta";
-        $sql = $wpdb->prepare("SELECT * FROM ". $table_name ." WHERE meta_key = %s", _lti_consumer_key);
+        $sql = "SELECT * FROM ". $table_name ." WHERE meta_key = '_lti_consumer_key'";
         $consumer_key = $wpdb->get_row($sql);
 
-        $sql = $wpdb->prepare("SELECT * FROM ".$table_name." WHERE meta_key = %s", _lti_consumer_secret);
+        $sql = "SELECT * FROM ".$table_name." WHERE meta_key = '_lti_consumer_secret'";
         $consumer_secret = $wpdb->get_row($sql);
 
         switch_to_blog($current_blog);
@@ -301,7 +301,7 @@ class WISCPB_LTI {
       }
     }
 
-    
+
 
     // If the user is not currently logged in... authenticate as the matched account.
     if ( ! is_user_logged_in() || $logged_out ) {
@@ -361,7 +361,7 @@ class WISCPB_LTI {
     else {
         $password = wp_generate_password( WISCPB_LTI_PASSWORD_LENGTH, true);
 
-      //E. Scull: TODO, add user's name and other details here too. 
+      //E. Scull: TODO, add user's name and other details here too.
       $user_id = wp_create_user( $username, $password, $username );
       $user = new WP_User( $user_id );
       $user->set_role( 'subscriber' );
@@ -375,7 +375,7 @@ class WISCPB_LTI {
   }
 
   public static function record_new_register($user, $blog){
-    //E. Scull: Comment out role-related filtering; we want names and default email for everyone (including students) 
+    //E. Scull: Comment out role-related filtering; we want names and default email for everyone (including students)
 
     $roles = '';
     if (isset($_POST['ext_roles'])) {
