@@ -3,7 +3,7 @@
  * @wordpress-plugin
  * Plugin Name:       Wisc Content Auth LTI
  * Description:       LTI Integration for Pressbooks and Grassblade at UW-Madison. Based on the Candela LTI integration from Lumen Learning, but looks for a specified custom LTI parameter to use for the WordPress login id (instead of using the generated LTI user id)
- * Version:           0.2.1
+ * Version:           0.2.2
  * Author:            UW-Madison Learning Solutions
  * Author URI:
  * Text Domain:       lti
@@ -72,7 +72,7 @@ class WISCPB_LTI {
 
     define('WISCPB_LTI_TEACHERS_ONLY', 'wiscpb_lti_teachers_only');
     add_option( WISCPB_LTI_TEACHERS_ONLY, false );
-
+    
 	}
 
   public static function addLTILink($post){
@@ -181,8 +181,6 @@ class WISCPB_LTI {
     global $wp;
       $current_user = wp_get_current_user();
 
-    
-    
       WISCPB_LTI::save_outcome_info($_POST['lis_outcome_service_url'],
           $wp->query_vars['page_id'],
           $current_user->ID, $wp->query_vars['blog'], $_POST["lis_result_sourcedid"]);
@@ -273,6 +271,11 @@ class WISCPB_LTI {
     // if we do not have an external user_id skip account stuff.
     if ( empty($_POST[WISC_LTI_LOGIN_ID_POST_PARAM]) ) {
       return;
+    }
+
+    // We also require that this external id be an email address so that it can be used to create/identify a user.
+    if ( ! is_email( $_POST[WISC_LTI_LOGIN_ID_POST_PARAM] ) ) {
+      wp_die( 'Canvas ID provided to LTI tool ("' . $_POST[WISC_LTI_LOGIN_ID_POST_PARAM] . '") is not a valid email address.' );
     }
 
     // Find user account (if any) with matching ID
