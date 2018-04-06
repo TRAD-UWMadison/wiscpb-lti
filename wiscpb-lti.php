@@ -875,10 +875,10 @@ class WISCPB_LTI {
           self::getPOXGradeRequest());
 
       $table_name = $wpdb->base_prefix . "postmeta";
-      $sql = $wpdb->prepare("SELECT * FROM ". $table_name ." WHERE meta_key = %s", _lti_consumer_key);
+      $sql = $wpdb->prepare("SELECT * FROM $table_name WHERE meta_key = %s", '_lti_consumer_key');
       $consumer_key = $wpdb->get_row($sql);
 
-      $sql = $wpdb->prepare("SELECT * FROM ".$table_name." WHERE meta_key = %s", _lti_consumer_secret);
+      $sql = $wpdb->prepare("SELECT * FROM $table_name WHERE meta_key = %s", '_lti_consumer_secret');
       $consumer_secret = $wpdb->get_row($sql);
 
 
