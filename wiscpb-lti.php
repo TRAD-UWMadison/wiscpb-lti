@@ -27,12 +27,15 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 WISCPB_LTI::init();
 
 class WISCPB_LTI {
+
+  const DEBUG_LOG = TRUE;
+
   /**
    * Takes care of registering our hooks and setting constants.
    */
   public static function init() {
     if (isset($_GET['content_only'])) {
-       wp_enqueue_style('wisc-lti-nav', plugins_url('no-navigation.css', __FILE__));
+      add_action( 'init', array( __CLASS__, 'init_no_navigation' ) );
     }
 
     // Table name is always root (site)
@@ -72,8 +75,11 @@ class WISCPB_LTI {
 
     define('WISCPB_LTI_TEACHERS_ONLY', 'wiscpb_lti_teachers_only');
     add_option( WISCPB_LTI_TEACHERS_ONLY, false );
-    
 	}
+
+  public static function init_no_navigation() {
+    wp_enqueue_style('wisc-lti-nav', plugins_url('no-navigation.css', __FILE__));
+  }
 
   public static function addLTILink($post){
         add_meta_box( 'lti_meta_box', __( 'LTI Information', 'lti_meta' ), array(__CLASS__, 'build_lti_link'), 'post', 'normal', 'low');
@@ -942,5 +948,15 @@ class WISCPB_LTI {
         }
         return Net::doBody($endpoint, $method, $body,$header);
     }
+
+  public static function write_log( $log ) {
+    if ( true === WP_DEBUG && true === WISCPB_LTI::DEBUG_LOG ) {
+      if ( is_array( $log ) || is_object( $log ) ) {
+        error_log( print_r( $log, true ) );
+      } else {
+        error_log( $log );
+      }
+    }
+  }
 
 }
