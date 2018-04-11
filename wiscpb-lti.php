@@ -3,7 +3,7 @@
  * @wordpress-plugin
  * Plugin Name:       Wisc Content Auth LTI
  * Description:       LTI Integration for Pressbooks and Grassblade at UW-Madison. Based on the Candela LTI integration from Lumen Learning, but looks for a specified custom LTI parameter to use for the WordPress login id (instead of using the generated LTI user id)
- * Version:           0.2.2
+ * Version:           0.2.3
  * Author:            UW-Madison Learning Solutions
  * Author URI:
  * Text Domain:       lti
@@ -63,7 +63,11 @@ class WISCPB_LTI {
     add_action( 'parse_request', array( __CLASS__, 'parse_request' ) );
     add_action('add_meta_boxes', array(__CLASS__,'addLTILink'));
 
-    // Respond to LTI launches
+      add_action('admin_menu', array(__CLASS__, 'setup_lti_admin_menus'));
+
+
+
+      // Respond to LTI launches
     add_action( 'lti_setup', array( __CLASS__, 'lti_setup' ) );
     add_action( 'lti_launch', array( __CLASS__, 'lti_launch') );
 
@@ -76,6 +80,46 @@ class WISCPB_LTI {
     define('WISCPB_LTI_TEACHERS_ONLY', 'wiscpb_lti_teachers_only');
     add_option( WISCPB_LTI_TEACHERS_ONLY, false );
 	}
+
+  function setup_lti_admin_menus() {
+        add_options_page('LTI Restrictions', 'LTI Restriction Settings', 'manage_options',
+            'lti_settings', array(__CLASS__,'lti_settings'));
+  }
+
+    function lti_settings() {
+        if (!current_user_can('manage_options')) {
+            wp_die('You do not have sufficient permissions to access this page.');
+        }
+
+        echo "<h1>LTI Restriction Settings</h1>";
+
+        if (isset($_POST['submit']) && $_SERVER["REQUEST_METHOD"] == "POST") {
+            if(!empty($_POST['restrict-lti'])) {
+                $restrict_lti = esc_attr($_POST['restrict-lti']);
+                update_option("restrict-lti", $restrict_lti);
+            } else {
+                update_option("restrict-lti", "0");
+            }
+
+            echo "<div><h2 class='creport-info-message'>Settings saved</h2></div>";
+        }
+
+        $restrict_lti = get_option('restrict-lti');
+
+
+        ?>
+
+        <form method="POST" action="">
+            <p style="width:200px;"><?php _e("Restrict page views to only LTI launches", 'lti_settings'); ?>
+                <input type="checkbox" id="restrict-lti" name="restrict-lti" value="1"<?php checked( '1' , $restrict_lti) ?>"/>
+            </p>
+            <br /><br />
+            <input name="submit" type="submit" id="submit" value="Save" class="button-primary" />
+        </form>
+
+        <?php
+
+    }
 
   public static function init_no_navigation() {
     wp_enqueue_style('wisc-lti-nav', plugins_url('no-navigation.css', __FILE__));
@@ -168,7 +212,9 @@ class WISCPB_LTI {
 
   public static function restrict_access(){
       global $wp_query;
-      if (current_user_can('edit_posts') || isset($_REQUEST['lti_context_id'])){
+      $restrict_lti = get_option('restrict-lti');
+
+      if (current_user_can('edit_posts') || isset($_REQUEST['lti_context_id']) || $restrict_lti != 1){
           return;
       } else {
           // Not through LTI or an editing user, redirect to 403
