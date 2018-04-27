@@ -1,3 +1,17 @@
 header.header, nav.nav-reading, .nav-container, #sidebar, .navigation, .footer {
     display: none;
 }
+
+html .wrapper, .wrapper #wrap, .wrapper #wrap, #content{
+  margin: 0;
+}
+
+div#wrap, div#content {
+  width: 100%;
+  max-width: 750px;
+  box-sizing: border-box;
+}
+
+.single-chapter #content {
+  padding: 0 10px 0 35px; 
+}
