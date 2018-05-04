@@ -3,7 +3,7 @@
  * @wordpress-plugin
  * Plugin Name:       Wisc Content Auth LTI
  * Description:       LTI Integration for Pressbooks and Grassblade at UW-Madison. Based on the Candela LTI integration from Lumen Learning, but looks for a specified custom LTI parameter to use for the WordPress login id (instead of using the generated LTI user id)
- * Version:           0.2.4
+ * Version:           0.2.5
  * Author:            UW-Madison Learning Solutions
  * Author URI:
  * Text Domain:       lti
@@ -75,6 +75,8 @@ class WISCPB_LTI {
 
 //    add_action('admin_menu', array( __CLASS__, 'admin_menu'));
 
+    add_action('post_submitbox_misc_actions', array(__CLASS__, 'createPostRestrictField'));
+    add_action('save_post', array(__CLASS__, 'savePostRestrictField'));
     add_action('wp', array(__CLASS__, 'restrict_access'));
 
     define('WISCPB_LTI_TEACHERS_ONLY', 'wiscpb_lti_teachers_only');
@@ -168,40 +170,6 @@ class WISCPB_LTI {
     WISCPB_LTI::create_db_table();
   }
 
-  // Comment out the code that adds the deprecated "LTI Maps" functionality to the admin nav.
-  // TODO: Clean out this Mapping functionality from this entire plugin; it is vestigial and should be removed.
-
-  // public static function admin_menu() {
-  //   add_menu_page(
-  //     __('LTI maps', 'candela_lti'),
-  //     __('LTI maps', 'candela_lti'),
-  //     CANDELA_LTI_CAP_LINK_LTI,
-  //     'lti-maps',
-  //     array(__CLASS__, 'lti_maps_page_handler')
-  //   );
-  // }
-
-  // public static function lti_maps_page_handler() {
-  //   global $wpdb;
-
-  //   include_once(__DIR__ . '/candela-lti-table.php');
-  //   $table = new Candela_LTI_Table;
-  //   $table->prepare_items();
-
-  //   $message = '';
-
-  //   if ( 'delete' === $table->current_action() ) {
-  //     $message = '<div class="updated below-h2" id="message"><p>' . sprintf(__('Maps deleted: %d', 'candela_lti'), count($_REQUEST['ID'])) . '</p></div>';
-  //   }
-
-  //   print '<div class="wrap">';
-  //   print $message;
-  //   print '<form id="candela-lti-maps" method="GET">';
-  //   print '<input type="hidden" name="page" value="' . $_REQUEST['page'] . '" />';
-  //   $table->display();
-  //   print '</form>';
-  //   print '</div>';
-  // }
 
   /**
    * Do any necessary cleanup.
@@ -210,11 +178,69 @@ class WISCPB_LTI {
     WISCPB_LTI::remove_db_table();
   }
 
-  public static function restrict_access(){
-      global $wp_query;
-      $restrict_lti = get_option('restrict-lti');
+  public static function createPostRestrictField(){
+      $post_id = get_the_ID();
 
-      if (current_user_can('edit_posts') || isset($_REQUEST['lti_context_id']) || $restrict_lti != 1){
+      if (!(get_post_type($post_id) == 'post' || get_post_type($post_id) == 'page' ||
+          get_post_type($post_id) == 'chapter')) {
+          return;
+      }
+
+      $value = get_post_meta($post_id, 'post_restrict_lti', true);
+      wp_nonce_field('restrict_nonce'.$post_id, 'restrict_nonce');
+
+      $buttonText = 'Restrict content to LTI Launches';
+
+      $restrict_lti = get_option('restrict-lti');
+      if ($restrict_lti == 1){
+          $buttonText = 'Restricted at the site level';
+          $value = true;
+      }
+
+      ?>
+      <div class="misc-pub-section misc-pub-section-first">
+          <label><input type="checkbox" value="1" <?php checked($value, true, true); disabled($restrict_lti == 1, true, true); ?> name="post_restrict_lti" /><?php _e($buttonText); ?></label>
+      </div>
+      <?php
+  }
+
+  public static function savePostRestrictField($post_id){
+      if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) {
+          return;
+      }
+
+      if (
+          !isset($_POST['restrict_nonce']) ||
+          !wp_verify_nonce($_POST['restrict_nonce'], 'restrict_nonce'.$post_id)
+      ) {
+          return;
+      }
+
+      if (!current_user_can('edit_post', $post_id)) {
+          return;
+      }
+
+      $restrict_lti = get_option('restrict-lti');
+      if ($restrict_lti == 1){
+          return;
+      }
+
+      if (isset($_POST['post_restrict_lti'])) {
+          update_post_meta($post_id, 'post_restrict_lti', $_POST['post_restrict_lti']);
+      } else {
+          delete_post_meta($post_id, 'post_restrict_lti');
+      }
+  }
+
+  public static function restrict_access(){
+
+      $post_id = get_the_ID();
+      $value = get_post_meta($post_id, 'post_restrict_lti', true);
+
+      $restrict_lti = get_option('restrict-lti');
+      $should_restrict = $value || $restrict_lti == 1;
+
+      if (current_user_can('edit_posts') || isset($_REQUEST['lti_context_id']) || !$should_restrict){
           return;
       } else {
           // Not through LTI or an editing user, redirect to 403
