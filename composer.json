@@ -2,7 +2,6 @@
     "name": "trad-uwmadison/wiscpb-lti",
     "description": "LTI Integration for Pressbooks at UW-Madison. Based on the Candela LTI integration from Lumen Learning.",
     "homepage": "https://github.com/TRAD-UWMadison/wiscpb-lti/",
-    "license": "MIT",
     "authors": [
         {
             "name": "UW-Madison",
