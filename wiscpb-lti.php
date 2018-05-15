@@ -290,7 +290,7 @@ class WISCPB_LTI {
     }
 
     // redirect to primary site
-    wp_redirect( get_site_url( 1 ) );
+    wp_redirect( get_home_url( 1 ) );
     exit;
   }
 
@@ -781,7 +781,7 @@ class WISCPB_LTI {
         // Map is either not set at all or needs to be set, inject content to do so.
         $text = __('Add LTI link');
         $hover = __('resource_link_id(##RES##)');
-        $url = get_site_url(1) . '/api/wiscpblti';
+        $url = get_home_url(1) . '/api/wiscpblti';
         $url = wp_nonce_url($url, 'mapping-lti-link', 'wiscpb-lti-nonce');
         $url .= '&resource_link_id=' . urlencode($map->resource_link_id) . '&target_action=' . urlencode( $target_action ) . '&blog=' . get_current_blog_id();
         $links['add'] = '<div class="lti addmap"><a class="btn blue" href="' . $url . '" title="' . esc_attr( str_replace('##RES##', $map->resource_link_id, $hover) ) . '">' . $text . '</a></div>';
@@ -789,7 +789,7 @@ class WISCPB_LTI {
 
       $maps = WISCPB_LTI::get_maps_by_target_action();
       if ( ! empty( $maps ) ) {
-        $base_url = get_site_url(1) . '/api/wiscpblti';
+        $base_url = get_home_url(1) . '/api/wiscpblti';
         $base_url = wp_nonce_url($base_url, 'unmapping-lti-link', 'wiscpb-lti-nonce');
         $text = __('Remove LTI link');
         $hover = __('resource_link_id(##RES##)');
