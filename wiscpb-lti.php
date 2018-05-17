@@ -88,7 +88,7 @@ class WISCPB_LTI {
             'lti_settings', array(__CLASS__,'lti_settings'));
   }
 
-    function lti_settings() {
+  function lti_settings() {
         if (!current_user_can('manage_options')) {
             wp_die('You do not have sufficient permissions to access this page.');
         }
@@ -169,7 +169,6 @@ class WISCPB_LTI {
 
     WISCPB_LTI::create_db_table();
   }
-
 
   /**
    * Do any necessary cleanup.
@@ -503,8 +502,6 @@ class WISCPB_LTI {
     switch_to_blog($curr);
   }
 
-
-
   // Should use email from LTI instead?
   public static function default_lti_email( $username ) {
     return $username . '@' . WISC_DEFAULT_EMAIL_DOMAIN;
@@ -578,7 +575,6 @@ class WISCPB_LTI {
     endif;
   }
 
-
   //E. Scull - Add function to find user by login name (username) instead of external_id meta field
   public static function find_user_by_login( $login ) {
     switch_to_blog(1);
@@ -621,7 +617,6 @@ class WISCPB_LTI {
 
     return $query_vars;
   }
-
 
   /**
    * Update the database
@@ -965,7 +960,7 @@ class WISCPB_LTI {
 
   }
 
-    public static function getPOXGradeRequest() {
+  public static function getPOXGradeRequest() {
         return '<?xml version = "1.0" encoding = "UTF-8"?>
     <imsx_POXEnvelopeRequest xmlns = "http://www.imsglobal.org/services/ltiv1p1/xsd/imsoms_v1p0">
       <imsx_POXHeader>
@@ -992,7 +987,7 @@ class WISCPB_LTI {
     </imsx_POXEnvelopeRequest>';
     }
 
-    public static function sendOAuthBody($method, $endpoint, $oauth_consumer_key, $oauth_consumer_secret,
+  public static function sendOAuthBody($method, $endpoint, $oauth_consumer_key, $oauth_consumer_secret,
                                          $content_type, $body, $more_headers=false, $signature=false)
     {
         $files = glob( ABSPATH . 'wp-content/plugins/wiscpb-lti/OAuth/*.php');
