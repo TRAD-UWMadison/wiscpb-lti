@@ -334,8 +334,7 @@ class WISCPB_LTI {
   }
 
   /**
-   * Take care of authenticating the incoming user and creating an account if
-   * required.
+   * Take care of authenticating the incoming user and creating an account if required.
    */
   public static function lti_accounts() {
       global $wp;
@@ -579,6 +578,9 @@ class WISCPB_LTI {
   public static function find_user_by_login( $login ) {
     switch_to_blog(1);
     $user = get_user_by( 'login', $login );
+    if ( empty ( $user ) ) {
+      $user = get_user_by( 'email', $login );
+    }
     restore_current_blog();
 
     return $user;
