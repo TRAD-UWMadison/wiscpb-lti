@@ -3,7 +3,7 @@
  * @wordpress-plugin
  * Plugin Name:       Wisc Content Auth LTI
  * Description:       LTI Integration for Pressbooks and Grassblade at UW-Madison. Based on the Candela LTI integration from Lumen Learning, but looks for a specified custom LTI parameter to use for the WordPress login id (instead of using the generated LTI user id)
- * Version:           0.2.6
+ * Version:           0.2.7
  * Author:            UW-Madison Learning Solutions
  * Author URI:
  * Text Domain:       lti
@@ -992,11 +992,12 @@ class WISCPB_LTI {
   public static function sendOAuthBody($method, $endpoint, $oauth_consumer_key, $oauth_consumer_secret,
                                          $content_type, $body, $more_headers=false, $signature=false)
     {
-        $files = glob( ABSPATH . 'wp-content/plugins/wiscpb-lti/OAuth/*.php');
+        $files = glob( __DIR__ . '/OAuth/*.php' );
+
         foreach ($files as $file) {
             require_once($file);
         }
-        require_once (ABSPATH . '/wp-content/plugins/wiscpb-lti/Net.php');
+        require_once( __DIR__ . '/../wiscpb-lti/Net.php' );
 
         $hmac_method = new OAuthSignatureMethod_HMAC_SHA1();
         $hash = base64_encode(sha1($body, TRUE));
